@@ -1,6 +1,9 @@
-
+#include <Arduino.h>
 // RGB leds
 #include <Adafruit_NeoPixel.h>
+
+// TM1637 Display 7segmentos x 4 bloques
+#include <TM1637Display.h>
 
 // RTC DS1307 (RELOJ)
 #include <Wire.h>
@@ -21,6 +24,11 @@ int COLORS[4][3]{
     {255, 0, 0}
 };
 
+// TM1637 Display 7segmentos x 4 bloques
+const int CLK = 14; //Set the CLK pin connection to the display
+const int DIO = 33; //Set the DIO pin connection to the display
+ 
+TM1637Display display(CLK, DIO); //set up the 4-Digit Display.
 
 // RTC DS1307 (RELOJ)
 #define DS3231_I2C_ADDRESS 0x68
@@ -57,7 +65,7 @@ byte *hour,
 byte *dayOfWeek,
 byte *dayOfMonth,
 byte *month,
-byte *year){
+byte *year) {
   Wire.beginTransmission(DS3231_I2C_ADDRESS);
   Wire.write(0); // set DS3231 register pointer to 00h
   Wire.endTransmission();
@@ -133,6 +141,11 @@ void setup() {
   // RGB
   pixels.begin();
 
+  // TM1637 Display 7segmentos x 4 bloques
+  display.setBrightness(0x0a); //set the diplay to maximum brightness
+  display.showNumberDec(0000, true);
+
+
   // RTC DS1307 (RELOJ)
   // Inicia el reloj: DS1307 seconds, minutes, hours, day, date, month, year
   //setDS3231time(30,33,23,5,30,1,20);
@@ -140,6 +153,12 @@ void setup() {
 
 void loop() {
   Serial.println("--- Comienza todo el loop ---");
+
+
+  // Devuelve un int preparado para ser mostrado por la pantalla directamente
+  byte second, minute, hour, dayOfWeek, dayOfMonth, month, year;
+  // retrieve data from DS3231
+  readDS3231time(&second, &minute, &hour, &dayOfWeek, &dayOfMonth, &month, &year);
 
   // RGB
 
@@ -169,10 +188,39 @@ void loop() {
     }
 
     pixels.show();
-    delay(DELAYVAL);
+
+    // TM1637 Display 7segmentos x 4 bloques
+    //display.clear();
+    int value;
+    if (hour > 0) {
+      value = (hour*100) + minute;
+    } else {
+      value = minute;
+    }
+
+    Serial.print(value);
+    Serial.println();
+
+    Serial.print(hour);
+    Serial.println();
+
+    Serial.print(minute);
+    Serial.println();
+    
+    //uint8_t segto;
+    //segto = 0x80 | display.encodeDigit((value / 100)%10);
+    //Serial.print(segto);
+    //Serial.println();
+    //display.setSegments(&segto, 1, 1);
+    //display.showNumberDec(value, true);
+    //display.showNumberDecEx(value, true, true);
+    display.showNumberDecEx(value, 0b11100000, true, 4, 0);
 
     // RTC
     displayTime();
+
+    // Pausa entre iteraciones
+    delay(DELAYVAL);
   }
 }
 
