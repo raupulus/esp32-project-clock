@@ -15,7 +15,7 @@
 #define PIN 32
 #define NUMPIXELS 12
 Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
-#define DELAYVAL 5000
+#define DELAYVAL 1000
 // Listado de colores (verde, azul, naranja, rojo)
 int COLORS[4][3]{
     {0, 255, 0},
@@ -29,6 +29,8 @@ const int CLK = 14; //Set the CLK pin connection to the display
 const int DIO = 33; //Set the DIO pin connection to the display
  
 TM1637Display display(CLK, DIO); //set up the 4-Digit Display.
+// Devuelve un int preparado para ser mostrado por la pantalla directamente
+  byte second, minute, hour, dayOfWeek, dayOfMonth, month, year;
 
 // RTC DS1307 (RELOJ)
 #define DS3231_I2C_ADDRESS 0x68
@@ -154,22 +156,38 @@ void setup() {
 void loop() {
   Serial.println("--- Comienza todo el loop ---");
 
-
-  // Devuelve un int preparado para ser mostrado por la pantalla directamente
-  byte second, minute, hour, dayOfWeek, dayOfMonth, month, year;
   // retrieve data from DS3231
   readDS3231time(&second, &minute, &hour, &dayOfWeek, &dayOfMonth, &month, &year);
 
   // RGB
-
   // Cada 5 segundos en ciende un led (12*5 = 1 minuto)
   // Cada bloque de 3 led cambiará de color (verde, azul, naranja, rojo)
+  int n_leds_on = int ((second / 60.0) * 12);
+  int color_leds = int ((n_leds_on / 12.0) * 4);
+  
+  Serial.print(second);
+  Serial.println();
+  Serial.print(n_leds_on);
+  Serial.println();
+  Serial.print(color_leds);
+  Serial.println();
 
-  pixels.clear();
+  if (n_leds_on < 1) {
+    pixels.clear();
+  }
 
-  // TODO → Colores según el segundo actual de la lectura del reloj
-  for (int i = 0; i < NUMPIXELS; i++) {
+  for (int i = 0; i <= int n_leds_on; i++) {
     Serial.println("--- Iteración en el for ---");
+    if (i <= n_leds_on)
+    {
+      pixels.setPixelColor(i, pixels.Color(COLORS[color_leds][0], COLORS[color_leds][1], COLORS[color_leds][2]));
+      pixels.show();
+
+      Serial.print("Entra");
+      Serial.println();
+    }
+
+    /*
     if (i < 3)
     {
       pixels.setPixelColor(i, pixels.Color(COLORS[0][0], COLORS[0][1], COLORS[0][2]));
@@ -186,42 +204,33 @@ void loop() {
     {
       pixels.setPixelColor(i, pixels.Color(COLORS[3][0], COLORS[3][1], COLORS[3][2]));
     }
+    */
 
-    pixels.show();
-
-    // TM1637 Display 7segmentos x 4 bloques
-    //display.clear();
-    int value;
-    if (hour > 0) {
-      value = (hour*100) + minute;
-    } else {
-      value = minute;
-    }
-
-    Serial.print(value);
-    Serial.println();
-
-    Serial.print(hour);
-    Serial.println();
-
-    Serial.print(minute);
-    Serial.println();
     
-    //uint8_t segto;
-    //segto = 0x80 | display.encodeDigit((value / 100)%10);
-    //Serial.print(segto);
-    //Serial.println();
-    //display.setSegments(&segto, 1, 1);
-    //display.showNumberDec(value, true);
-    //display.showNumberDecEx(value, true, true);
-    display.showNumberDecEx(value, 0b11100000, true, 4, 0);
-
-    // RTC
-    displayTime();
-
-    // Pausa entre iteraciones
-    delay(DELAYVAL);
   }
+
+  // TM1637 Display 7segmentos x 4 bloques
+  int value;
+  if (hour > 0) {
+    value = (hour*100) + minute;
+  } else {
+    value = minute;
+  }
+  
+  //uint8_t segto;
+  //segto = 0x80 | display.encodeDigit((value / 100)%10);
+  //Serial.print(segto);
+  //Serial.println();
+  //display.setSegments(&segto, 1, 1);
+  //display.showNumberDec(value, true);
+  //display.showNumberDecEx(value, true, true);
+  display.showNumberDecEx(value, 0b11100000, true, 4, 0);
+
+  // RTC
+  displayTime();
+
+  // Pausa entre iteraciones
+  delay(DELAYVAL);
 }
 
 /**
