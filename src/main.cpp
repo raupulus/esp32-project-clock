@@ -1,4 +1,6 @@
 #include <Arduino.h>
+#include <string>
+
 // RGB leds
 #include <Adafruit_NeoPixel.h>
 
@@ -7,6 +9,9 @@
 
 // RTC DS1307 (RELOJ)
 #include <Wire.h>
+
+// LiquidCrystal i2c (pantalla 16x2)
+#include <LiquidCrystal_I2C.h>
 
 // RGB leds
 #ifdef __AVR__
@@ -43,6 +48,16 @@ byte decToBcd(byte val){
 byte bcdToDec(byte val){
   return( (val/16*10) + (val%16) );
 }
+
+// Bosh BMP180
+Adafruit_BMP085 bmp;
+
+
+// LiquidCrystal i2c (pantalla 16x2) Puede ser la dirección: 0x27, 0x38
+#define BACKLIGHT_PIN 4
+LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);  // Set the LCD I2C address
+//LiquidCrystal_I2C lcd(0x38, BACKLIGHT_PIN, POSITIVE);  // Set the LCD I2C address
+
 
 // Agrega timestamp al módulo RTC DS1307 (RELOJ)
 void setDS3231time(byte second, byte minute, byte hour, byte dayOfWeek, byte
@@ -82,7 +97,7 @@ byte *year) {
   *year = bcdToDec(Wire.read());
 }
 
-// Muestr datos por consola del módulo RTC DS1307 (RELOJ)
+// Muestra datos por consola del módulo RTC DS1307 (RELOJ)
 void displayTime(){
   byte second, minute, hour, dayOfWeek, dayOfMonth, month, year;
   // retrieve data from DS3231
@@ -142,6 +157,8 @@ void setup() {
 
   // RGB
   pixels.begin();
+  pixels.setBrightness(30);
+  pixels.show(); // Inicializa todos los píxeles a 'off'
 
   // TM1637 Display 7segmentos x 4 bloques
   display.setBrightness(0x0a); //set the diplay to maximum brightness
@@ -149,8 +166,29 @@ void setup() {
 
 
   // RTC DS1307 (RELOJ)
-  // Inicia el reloj: DS1307 seconds, minutes, hours, day, date, month, year
-  //setDS3231time(30,33,23,5,30,1,20);
+  // Setea valores del reloj: DS1307 seconds, minutes, hours, day, date, month, year
+  //setDS3231time(00,39,20,5,11,2,20);
+
+
+  // Bosh BMP180
+  if (!bmp.begin()) {
+	  Serial.println("Could not find a valid BMP085 sensor, check wiring!");
+    delay ( 5000 );
+	  //while (1) {}
+  }
+
+  // LiquidCrystal i2c (pantalla 16x2)
+  // Enciendo la luz de fondo utilizando el pin como salida, así se puede apagar desde código.
+  pinMode ( BACKLIGHT_PIN, OUTPUT );
+  digitalWrite ( BACKLIGHT_PIN, HIGH );
+  
+  lcd.begin(16,2);  // initialize the lcd 
+
+  lcd.home ();                   // go home
+  lcd.print("ESP32 BY RAUL");  
+  lcd.setCursor ( 0, 1 );        // go to the next line
+  lcd.print (" INICIALIZANDO...   ");
+  delay ( 1000 );
 }
 
 void loop() {
@@ -174,40 +212,30 @@ void loop() {
 
   if (n_leds_on < 1) {
     pixels.clear();
-  }
-
-  for (int i = 0; i <= int n_leds_on; i++) {
-    Serial.println("--- Iteración en el for ---");
-    if (i <= n_leds_on)
-    {
-      pixels.setPixelColor(i, pixels.Color(COLORS[color_leds][0], COLORS[color_leds][1], COLORS[color_leds][2]));
-      pixels.show();
-
-      Serial.print("Entra");
-      Serial.println();
-    }
-
-    /*
-    if (i < 3)
-    {
-      pixels.setPixelColor(i, pixels.Color(COLORS[0][0], COLORS[0][1], COLORS[0][2]));
-    }
-    else if (i < 6)
-    {
-      pixels.setPixelColor(i, pixels.Color(COLORS[1][0], COLORS[1][1], COLORS[1][2]));
-    }
-    else if (i < 9)
-    {
-      pixels.setPixelColor(i, pixels.Color(COLORS[2][0], COLORS[2][1], COLORS[2][2]));
-    }
-    else
-    {
-      pixels.setPixelColor(i, pixels.Color(COLORS[3][0], COLORS[3][1], COLORS[3][2]));
-    }
-    */
-
+    pixels.setPixelColor(0, pixels.Color(COLORS[color_leds][0], COLORS[color_leds][1], COLORS[color_leds][2]));
+    pixels.show();
+  } else {
+    pixels.fill(pixels.Color(COLORS[color_leds][0], COLORS[color_leds][1], COLORS[color_leds][2]), 0, n_leds_on + 1);
     
+    /*
+    for (int i = 0; i <= n_leds_on; i++) {
+      Serial.println("--- Iteración en el for ---");
+      if (i <= n_leds_on) {
+        pixels.setPixelColor(i, pixels.Color(COLORS[color_leds][0], COLORS[color_leds][1], COLORS[color_leds][2]));
+
+        Serial.print("Entra: ");
+        Serial.print(i);
+        Serial.println();
+      }
+    }
+        */
+
+    // Muestra los leds habilitados para esta iteración
+    pixels.show();
   }
+
+  
+
 
   // TM1637 Display 7segmentos x 4 bloques
   int value;
@@ -228,6 +256,56 @@ void loop() {
 
   // RTC
   displayTime();
+
+
+  // Bosh BMP180
+  int temperature = bmp.readTemperature();
+  int pressure = bmp.readPressure();
+  int altitude = bmp.readAltitude();
+  int sealevelpresure = bmp.readSealevelPressure();
+  int realaltitude = bmp.readAltitude(101500);
+
+  Serial.print("Temperature = ");
+  Serial.print(temperature);
+  Serial.println(" *C");
+  
+  Serial.print("Pressure = ");
+  Serial.print(pressure);
+  Serial.println(" Pa");
+  
+  // Calculate altitude assuming 'standard' barometric
+  // pressure of 1013.25 millibar = 101325 Pascal
+  Serial.print("Altitude = ");
+  Serial.print(altitude);
+  Serial.println(" meters");
+
+  Serial.print("Pressure at sealevel (calculated) = ");
+  Serial.print(sealevelpresure);
+  Serial.println(" Pa");
+
+  // you can get a more precise measurement of altitude
+  // if you know the current sea level pressure which will
+  // vary with weather and such. If it is 1015 millibars
+  // that is equal to 101500 Pascals.
+  Serial.print("Real altitude = ");
+  Serial.print(realaltitude);
+  Serial.println(" meters");
+  
+  Serial.println();
+
+  // LiquidCrystal i2c (pantalla 16x2)
+  lcd.clear();
+  lcd.home();
+  lcd.print(temperature);
+  lcd.println(" *C ");
+  lcd.print(pressure);
+  lcd.println(" Pa ");
+  lcd.print(altitude);
+  lcd.println(" m");
+  lcd.setCursor ( 0, 1 );
+  lcd.print("AT SEALEVEL: = ");
+  lcd.print(sealevelpresure);
+  lcd.println(" Pa");
 
   // Pausa entre iteraciones
   delay(DELAYVAL);
