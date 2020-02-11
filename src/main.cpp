@@ -10,6 +10,9 @@
 // RTC DS1307 (RELOJ)
 #include <Wire.h>
 
+// Bosh BMP180
+#include <Adafruit_BMP085.h>
+
 // LiquidCrystal i2c (pantalla 16x2)
 #include <LiquidCrystal_I2C.h>
 
@@ -259,11 +262,11 @@ void loop() {
 
 
   // Bosh BMP180
-  int temperature = bmp.readTemperature();
+  float temperature = bmp.readTemperature();
   int pressure = bmp.readPressure();
-  int altitude = bmp.readAltitude();
+  float altitude = bmp.readAltitude();
   int sealevelpresure = bmp.readSealevelPressure();
-  int realaltitude = bmp.readAltitude(101500);
+  float realaltitude = bmp.readAltitude(101500);
 
   Serial.print("Temperature = ");
   Serial.print(temperature);
@@ -297,15 +300,13 @@ void loop() {
   lcd.clear();
   lcd.home();
   lcd.print(temperature);
-  lcd.println(" *C ");
+  lcd.print("C ");
   lcd.print(pressure);
-  lcd.println(" Pa ");
-  lcd.print(altitude);
-  lcd.println(" m");
+  lcd.print("Pa ");
   lcd.setCursor ( 0, 1 );
-  lcd.print("AT SEALEVEL: = ");
-  lcd.print(sealevelpresure);
-  lcd.println(" Pa");
+  lcd.print("Altitud: ");
+  lcd.print(altitude);
+  lcd.print("m");
 
   // Pausa entre iteraciones
   delay(DELAYVAL);
